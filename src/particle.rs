@@ -1,6 +1,6 @@
 //! Particle state and physics (platform-agnostic).
 
-use crate::renderer::ConfettiRenderer;
+use crate::renderer::{ConfettiRenderer, Ellipse};
 use crate::types::{Color, ConfettiOptions, Shape};
 use std::f64::consts::PI;
 
@@ -32,13 +32,13 @@ pub struct Particle {
 
 impl Particle {
     #[must_use]
-    pub fn new(
+    pub fn new<F: FnMut() -> f64>(
         opts: &ConfettiOptions,
         start_x: f64,
         start_y: f64,
         color: Color,
         shape: Shape,
-        rng: f64,
+        rng: &mut F,
     ) -> Self {
         let rad_angle = opts.angle * (PI / 180.0);
         let rad_spread = opts.spread * (PI / 180.0);
@@ -46,18 +46,18 @@ impl Particle {
         Self {
             x: start_x,
             y: start_y,
-            wobble: rng * 10.0,
-            wobble_speed: f64::min(0.11, rng * 0.1 + 0.05),
-            velocity: (opts.start_velocity * 0.5) + (rng * opts.start_velocity),
-            angle_2d: -rad_angle + ((0.5 * rad_spread) - (rng * rad_spread)),
-            tilt_angle: (rng * 0.5 + 0.25) * PI,
+            wobble: rng() * 10.0,
+            wobble_speed: f64::min(0.11, rng() * 0.1 + 0.05),
+            velocity: (opts.start_velocity * 0.5) + (rng() * opts.start_velocity),
+            angle_2d: -rad_angle + ((0.5 * rad_spread) - (rng() * rad_spread)),
+            tilt_angle: (rng() * 0.5 + 0.25) * PI,
             color,
             shape,
             tick: 0,
             total_ticks: opts.ticks,
             decay: opts.decay,
             drift: opts.drift,
-            random: rng + 2.0,
+            random: rng() + 2.0,
             tilt_sin: 0.0,
             tilt_cos: 0.0,
             wobble_x: 0.0,
@@ -108,10 +108,15 @@ impl Particle {
 
         match self.shape {
             Shape::Circle => {
-                let rx = (x2 - x1).abs() * self.oval_scalar;
-                let ry = (y2 - y1).abs() * self.oval_scalar;
-                let rotation = PI / 10.0 * self.wobble;
-                renderer.fill_ellipse(self.x, self.y, rx, ry, rotation, self.color, alpha);
+                renderer.fill_ellipse(&Ellipse {
+                    x: self.x,
+                    y: self.y,
+                    rx: (x2 - x1).abs() * self.oval_scalar,
+                    ry: (y2 - y1).abs() * self.oval_scalar,
+                    rotation: PI / 10.0 * self.wobble,
+                    color: self.color,
+                    alpha,
+                });
             }
             Shape::Star => {
                 let points = self.star_points();

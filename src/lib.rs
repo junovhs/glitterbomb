@@ -3,14 +3,14 @@
 //! A pure Rust confetti animation library.
 //! Works on web (WASM) and desktop.
 //!
-//! ## Quick Start (Web)
+//! ## Web
 //!
 //! ```rust,ignore
 //! use glitterbomb::{confetti, ConfettiOptions};
 //! confetti(&ConfettiOptions::default());
 //! ```
 //!
-//! ## Quick Start (Desktop)
+//! ## Desktop
 //!
 //! ```rust,ignore
 //! use glitterbomb::{ConfettiOptions, desktop};
@@ -22,7 +22,7 @@ mod renderer;
 mod types;
 
 pub use particle::Particle;
-pub use renderer::ConfettiRenderer;
+pub use renderer::{ConfettiRenderer, Ellipse};
 pub use types::{default_colors, Color, ConfettiOptions, Origin, Shape};
 
 #[cfg(feature = "web")]
@@ -31,7 +31,6 @@ pub mod web;
 #[cfg(feature = "desktop")]
 pub mod desktop;
 
-// Convenience re-export: `confetti()` uses web on wasm, desktop otherwise
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub use web::confetti;
 

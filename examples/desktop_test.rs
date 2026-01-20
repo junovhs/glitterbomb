@@ -1,3 +1,5 @@
+//! Run with: cargo run --example desktop_test --features desktop --no-default-features
+
 use glitterbomb::{Color, ConfettiOptions, Origin};
 
 fn main() {
