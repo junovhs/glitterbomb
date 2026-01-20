@@ -9,15 +9,7 @@
 //! use glitterbomb::{confetti, ConfettiOptions};
 //!
 //! // Fire with defaults
-//! confetti(ConfettiOptions::default());
-//!
-//! // Or customize it
-//! confetti(ConfettiOptions {
-//!     particle_count: 100,
-//!     spread: 70.0,
-//!     origin: Origin { x: 0.5, y: 0.6 },
-//!     ..Default::default()
-//! });
+//! confetti(&ConfettiOptions::default());
 //! ```
 //!
 //! ## With Dioxus
@@ -31,7 +23,7 @@
 //!     rsx! {
 //!         button {
 //!             onclick: move |_| {
-//!                 confetti(ConfettiOptions::default());
+//!                 confetti(&ConfettiOptions::default());
 //!             },
 //!             "🎉 Celebrate!"
 //!         }
@@ -58,11 +50,13 @@ pub struct Color {
 }
 
 impl Color {
+    #[must_use]
     pub const fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
     }
 
     /// Parse a hex color string like "#ff0000" or "ff0000"
+    #[must_use]
     pub fn from_hex(hex: &str) -> Self {
         let hex = hex.trim_start_matches('#');
         let hex = if hex.len() == 3 {
@@ -84,16 +78,17 @@ impl Color {
 }
 
 impl Color {
-    pub const RED: Color = Color::new(255, 0, 0);
-    pub const GREEN: Color = Color::new(0, 255, 0);
-    pub const BLUE: Color = Color::new(0, 0, 255);
-    pub const YELLOW: Color = Color::new(255, 255, 0);
-    pub const CYAN: Color = Color::new(0, 255, 255);
-    pub const MAGENTA: Color = Color::new(255, 0, 255);
-    pub const WHITE: Color = Color::new(255, 255, 255);
+    pub const RED: Self = Self::new(255, 0, 0);
+    pub const GREEN: Self = Self::new(0, 255, 0);
+    pub const BLUE: Self = Self::new(0, 0, 255);
+    pub const YELLOW: Self = Self::new(255, 255, 0);
+    pub const CYAN: Self = Self::new(0, 255, 255);
+    pub const MAGENTA: Self = Self::new(255, 0, 255);
+    pub const WHITE: Self = Self::new(255, 255, 255);
 }
 
 /// Default confetti color palette
+#[must_use]
 pub fn default_colors() -> Vec<Color> {
     vec![
         Color::from_hex("#26ccff"),
@@ -258,7 +253,7 @@ impl Particle {
     }
 
     fn render(&self, ctx: &CanvasRenderingContext2d) {
-        let progress = self.tick as f64 / self.total_ticks as f64;
+        let progress = f64::from(self.tick) / f64::from(self.total_ticks);
         let alpha = 1.0 - progress;
 
         let x1 = self.x + (self.random * self.tilt_cos);
@@ -267,8 +262,8 @@ impl Particle {
         let y2 = self.wobble_y + (self.random * self.tilt_sin);
 
         ctx.set_fill_style_str(&format!(
-            "rgba({}, {}, {}, {})",
-            self.color.r, self.color.g, self.color.b, alpha
+            "rgba({}, {}, {}, {alpha})",
+            self.color.r, self.color.g, self.color.b
         ));
 
         ctx.begin_path();
@@ -289,21 +284,21 @@ impl Particle {
             Shape::Star => {
                 let inner_radius = 4.0 * self.scalar;
                 let outer_radius = 8.0 * self.scalar;
-                let spikes = 5;
-                let step = PI / spikes as f64;
+                let spikes: i32 = 5;
+                let step = PI / f64::from(spikes);
                 let mut rot = PI / 2.0 * 3.0;
 
                 ctx.move_to(self.x, self.y - outer_radius);
 
                 for _ in 0..spikes {
-                    let x = self.x + rot.cos() * outer_radius;
-                    let y = self.y + rot.sin() * outer_radius;
-                    ctx.line_to(x, y);
+                    let sx = self.x + rot.cos() * outer_radius;
+                    let sy = self.y + rot.sin() * outer_radius;
+                    ctx.line_to(sx, sy);
                     rot += step;
 
-                    let x = self.x + rot.cos() * inner_radius;
-                    let y = self.y + rot.sin() * inner_radius;
-                    ctx.line_to(x, y);
+                    let sx = self.x + rot.cos() * inner_radius;
+                    let sy = self.y + rot.sin() * inner_radius;
+                    ctx.line_to(sx, sy);
                     rot += step;
                 }
             }
@@ -321,7 +316,7 @@ impl Particle {
 }
 
 // ============================================================================
-// ANIMATION STATE - Use try_borrow_mut to avoid panics
+// ANIMATION STATE
 // ============================================================================
 
 thread_local! {
@@ -340,15 +335,14 @@ struct AnimationState {
 // ============================================================================
 
 /// Fire confetti with the given options.
-pub fn confetti(opts: ConfettiOptions) {
+pub fn confetti(opts: &ConfettiOptions) {
     if opts.disable_for_reduced_motion && prefers_reduced_motion() {
         return;
     }
 
     let needs_new_animation = ANIMATION_STATE.with(|state| {
-        // Use try_borrow_mut to avoid panic if already borrowed
         let Ok(mut state) = state.try_borrow_mut() else {
-            return false; // Animation loop is running, just skip
+            return false;
         };
 
         if state.is_none() {
@@ -361,25 +355,26 @@ pub fn confetti(opts: ConfettiOptions) {
             });
         }
 
-        let s = state.as_mut().unwrap();
+        let s = state.as_mut().expect("state was just set");
         resize_canvas(&s.canvas);
 
-        let width = s.canvas.width() as f64;
-        let height = s.canvas.height() as f64;
+        let width = f64::from(s.canvas.width());
+        let height = f64::from(s.canvas.height());
         let start_x = width * opts.origin.x;
         let start_y = height * opts.origin.y;
 
         for i in 0..opts.particle_count {
             let color = opts.colors[i as usize % opts.colors.len()];
             let shape = opts.shapes[random_int(0, opts.shapes.len())];
-            s.particles.push(Particle::new(&opts, start_x, start_y, color, shape));
+            s.particles
+                .push(Particle::new(opts, start_x, start_y, color, shape));
         }
 
-        if !s.is_animating {
+        if s.is_animating {
+            false
+        } else {
             s.is_animating = true;
             true
-        } else {
-            false
         }
     });
 
@@ -389,7 +384,7 @@ pub fn confetti(opts: ConfettiOptions) {
 }
 
 /// Fire confetti on a specific canvas element.
-pub fn confetti_on_canvas(canvas: &HtmlCanvasElement, opts: ConfettiOptions) {
+pub fn confetti_on_canvas(canvas: &HtmlCanvasElement, opts: &ConfettiOptions) {
     if opts.disable_for_reduced_motion && prefers_reduced_motion() {
         return;
     }
@@ -402,8 +397,8 @@ pub fn confetti_on_canvas(canvas: &HtmlCanvasElement, opts: ConfettiOptions) {
         .dyn_into::<CanvasRenderingContext2d>()
         .expect("Could not cast to CanvasRenderingContext2d");
 
-    let width = canvas.width() as f64;
-    let height = canvas.height() as f64;
+    let width = f64::from(canvas.width());
+    let height = f64::from(canvas.height());
     let start_x = width * opts.origin.x;
     let start_y = height * opts.origin.y;
 
@@ -411,7 +406,7 @@ pub fn confetti_on_canvas(canvas: &HtmlCanvasElement, opts: ConfettiOptions) {
         .map(|i| {
             let color = opts.colors[i as usize % opts.colors.len()];
             let shape = opts.shapes[random_int(0, opts.shapes.len())];
-            Particle::new(&opts, start_x, start_y, color, shape)
+            Particle::new(opts, start_x, start_y, color, shape)
         })
         .collect();
 
@@ -435,14 +430,14 @@ pub fn reset() {
 
 /// Fire confetti from both sides of the screen.
 pub fn celebration() {
-    confetti(ConfettiOptions {
+    confetti(&ConfettiOptions {
         particle_count: 50,
         angle: 60.0,
         spread: 55.0,
         origin: Origin { x: 0.0, y: 0.6 },
         ..Default::default()
     });
-    confetti(ConfettiOptions {
+    confetti(&ConfettiOptions {
         particle_count: 50,
         angle: 120.0,
         spread: 55.0,
@@ -453,7 +448,7 @@ pub fn celebration() {
 
 /// Fire confetti straight up like fireworks.
 pub fn fireworks() {
-    confetti(ConfettiOptions {
+    confetti(&ConfettiOptions {
         particle_count: 100,
         spread: 360.0,
         start_velocity: 30.0,
@@ -465,7 +460,7 @@ pub fn fireworks() {
 
 /// Gentle snow-like falling confetti.
 pub fn snow() {
-    confetti(ConfettiOptions {
+    confetti(&ConfettiOptions {
         particle_count: 50,
         spread: 180.0,
         start_velocity: 10.0,
@@ -479,7 +474,7 @@ pub fn snow() {
 
 /// Confetti cannon from the bottom of the screen.
 pub fn cannon() {
-    confetti(ConfettiOptions {
+    confetti(&ConfettiOptions {
         particle_count: 150,
         spread: 60.0,
         start_velocity: 55.0,
@@ -504,6 +499,11 @@ fn random() -> f64 {
     js_sys::Math::random()
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 fn random_int(min: usize, max: usize) -> usize {
     (random() * (max - min) as f64).floor() as usize + min
 }
@@ -513,8 +513,7 @@ fn prefers_reduced_motion() -> bool {
         .match_media("(prefers-reduced-motion: reduce)")
         .ok()
         .flatten()
-        .map(|m| m.matches())
-        .unwrap_or(false)
+        .is_some_and(|m| m.matches())
 }
 
 fn create_canvas(z_index: i32) -> (HtmlCanvasElement, CanvasRenderingContext2d) {
@@ -534,11 +533,7 @@ fn create_canvas(z_index: i32) -> (HtmlCanvasElement, CanvasRenderingContext2d) 
     let _ = style.set_property("pointer-events", "none");
     let _ = style.set_property("z-index", &z_index.to_string());
 
-    document
-        .body()
-        .expect("no body")
-        .append_child(&canvas)
-        .ok();
+    document.body().expect("no body").append_child(&canvas).ok();
 
     let ctx = canvas
         .get_context("2d")
@@ -551,10 +546,19 @@ fn create_canvas(z_index: i32) -> (HtmlCanvasElement, CanvasRenderingContext2d) 
     (canvas, ctx)
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn resize_canvas(canvas: &HtmlCanvasElement) {
     let window = window();
-    let width = window.inner_width().ok().and_then(|v| v.as_f64()).unwrap_or(800.0) as u32;
-    let height = window.inner_height().ok().and_then(|v| v.as_f64()).unwrap_or(600.0) as u32;
+    let width = window
+        .inner_width()
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(800.0) as u32;
+    let height = window
+        .inner_height()
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(600.0) as u32;
 
     if canvas.width() != width {
         canvas.set_width(width);
@@ -577,15 +581,15 @@ fn start_animation() {
     *g.borrow_mut() = Some(Closure::new(move || {
         let should_continue = ANIMATION_STATE.with(|state| {
             let Ok(mut state) = state.try_borrow_mut() else {
-                return true; // Can't borrow, try again next frame
+                return true;
             };
 
             let Some(ref mut s) = *state else {
                 return false;
             };
 
-            let width = s.canvas.width() as f64;
-            let height = s.canvas.height() as f64;
+            let width = f64::from(s.canvas.width());
+            let height = f64::from(s.canvas.height());
             s.ctx.clear_rect(0.0, 0.0, width, height);
 
             s.particles.retain_mut(|p| {
@@ -600,7 +604,7 @@ fn start_animation() {
         });
 
         if should_continue {
-            request_animation_frame(f.borrow().as_ref().unwrap());
+            request_animation_frame(f.borrow().as_ref().expect("closure exists"));
         } else {
             ANIMATION_STATE.with(|state| {
                 if let Ok(mut state) = state.try_borrow_mut() {
@@ -612,7 +616,7 @@ fn start_animation() {
         }
     }));
 
-    request_animation_frame(g.borrow().as_ref().unwrap());
+    request_animation_frame(g.borrow().as_ref().expect("closure exists"));
 }
 
 fn run_standalone_animation(
@@ -632,8 +636,8 @@ fn run_standalone_animation(
     let particles_clone = particles.clone();
 
     *g.borrow_mut() = Some(Closure::new(move || {
-        let width = canvas_clone.width() as f64;
-        let height = canvas_clone.height() as f64;
+        let width = f64::from(canvas_clone.width());
+        let height = f64::from(canvas_clone.height());
         ctx_clone.clear_rect(0.0, 0.0, width, height);
 
         let mut parts = particles_clone.borrow_mut();
@@ -646,11 +650,11 @@ fn run_standalone_animation(
         });
 
         if !parts.is_empty() {
-            request_animation_frame(f.borrow().as_ref().unwrap());
+            request_animation_frame(f.borrow().as_ref().expect("closure exists"));
         }
     }));
 
-    request_animation_frame(g.borrow().as_ref().unwrap());
+    request_animation_frame(g.borrow().as_ref().expect("closure exists"));
 }
 
 // ============================================================================
@@ -659,7 +663,7 @@ fn run_standalone_animation(
 
 #[wasm_bindgen(js_name = confetti)]
 pub fn confetti_js() {
-    confetti(ConfettiOptions::default());
+    confetti(&ConfettiOptions::default());
 }
 
 #[wasm_bindgen(js_name = celebration)]
