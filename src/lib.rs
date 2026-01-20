@@ -66,7 +66,6 @@ impl Color {
     pub fn from_hex(hex: &str) -> Self {
         let hex = hex.trim_start_matches('#');
         let hex = if hex.len() == 3 {
-            // Expand shorthand like "f00" -> "ff0000"
             let chars: Vec<char> = hex.chars().collect();
             format!(
                 "{}{}{}{}{}{}",
@@ -84,7 +83,6 @@ impl Color {
     }
 }
 
-/// Predefined color palettes
 impl Color {
     pub const RED: Color = Color::new(255, 0, 0);
     pub const GREEN: Color = Color::new(0, 255, 0);
@@ -95,7 +93,7 @@ impl Color {
     pub const WHITE: Color = Color::new(255, 255, 255);
 }
 
-/// Default confetti color palette (matches canvas-confetti)
+/// Default confetti color palette
 pub fn default_colors() -> Vec<Color> {
     vec![
         Color::from_hex("#26ccff"),
@@ -120,9 +118,7 @@ pub enum Shape {
 /// Origin point for confetti emission (0.0 to 1.0, relative to canvas)
 #[derive(Clone, Copy, Debug)]
 pub struct Origin {
-    /// Horizontal position (0.0 = left, 1.0 = right)
     pub x: f64,
-    /// Vertical position (0.0 = top, 1.0 = bottom)
     pub y: f64,
 }
 
@@ -135,35 +131,20 @@ impl Default for Origin {
 /// Configuration options for confetti animation
 #[derive(Clone, Debug)]
 pub struct ConfettiOptions {
-    /// Number of confetti particles to launch
     pub particle_count: u32,
-    /// Launch angle in degrees (90 = straight up)
     pub angle: f64,
-    /// Spread angle in degrees
     pub spread: f64,
-    /// Initial velocity of particles
     pub start_velocity: f64,
-    /// Velocity decay rate (0.0 to 1.0)
     pub decay: f64,
-    /// Gravity pull (1.0 = normal)
     pub gravity: f64,
-    /// Horizontal drift
     pub drift: f64,
-    /// Animation duration in ticks (~60 ticks/second)
     pub ticks: u32,
-    /// Origin point for particle emission
     pub origin: Origin,
-    /// Available shapes for particles
     pub shapes: Vec<Shape>,
-    /// Available colors for particles
     pub colors: Vec<Color>,
-    /// Size scalar for particles
     pub scalar: f64,
-    /// CSS z-index for the canvas
     pub z_index: i32,
-    /// If true, particles don't wobble/rotate
     pub flat: bool,
-    /// Disable animation if user prefers reduced motion
     pub disable_for_reduced_motion: bool,
 }
 
@@ -250,7 +231,6 @@ impl Particle {
         }
     }
 
-    /// Update particle physics. Returns true if particle is still alive.
     fn update(&mut self) -> bool {
         self.x += self.angle_2d.cos() * self.velocity + self.drift;
         self.y += self.angle_2d.sin() * self.velocity + self.gravity;
@@ -277,7 +257,6 @@ impl Particle {
         self.tick < self.total_ticks
     }
 
-    /// Render the particle to the canvas
     fn render(&self, ctx: &CanvasRenderingContext2d) {
         let progress = self.tick as f64 / self.total_ticks as f64;
         let alpha = 1.0 - progress;
@@ -300,12 +279,11 @@ impl Particle {
                 let radius_y = (y2 - y1).abs() * self.oval_scalar;
                 let rotation = PI / 10.0 * self.wobble;
 
-                // Draw ellipse manually (wider browser support)
                 ctx.save();
-                ctx.translate(self.x, self.y).ok();
-                ctx.rotate(rotation).ok();
-                ctx.scale(radius_x.max(0.1), radius_y.max(0.1)).ok();
-                ctx.arc(0.0, 0.0, 1.0, 0.0, 2.0 * PI).ok();
+                let _ = ctx.translate(self.x, self.y);
+                let _ = ctx.rotate(rotation);
+                let _ = ctx.scale(radius_x.max(0.1), radius_y.max(0.1));
+                let _ = ctx.arc(0.0, 0.0, 1.0, 0.0, 2.0 * PI);
                 ctx.restore();
             }
             Shape::Star => {
@@ -343,7 +321,7 @@ impl Particle {
 }
 
 // ============================================================================
-// ANIMATION STATE
+// ANIMATION STATE - Use try_borrow_mut to avoid panics
 // ============================================================================
 
 thread_local! {
@@ -354,7 +332,7 @@ struct AnimationState {
     canvas: HtmlCanvasElement,
     ctx: CanvasRenderingContext2d,
     particles: Vec<Particle>,
-    animation_id: Option<i32>,
+    is_animating: bool,
 }
 
 // ============================================================================
@@ -362,79 +340,55 @@ struct AnimationState {
 // ============================================================================
 
 /// Fire confetti with the given options.
-///
-/// Creates a fullscreen canvas overlay and animates confetti particles.
-/// The canvas is automatically removed when the animation completes.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use glitterbomb::{confetti, ConfettiOptions, Origin};
-///
-/// // Fire from the bottom center
-/// confetti(ConfettiOptions {
-///     origin: Origin { x: 0.5, y: 1.0 },
-///     particle_count: 100,
-///     spread: 70.0,
-///     ..Default::default()
-/// });
-/// ```
 pub fn confetti(opts: ConfettiOptions) {
-    // Check reduced motion preference
     if opts.disable_for_reduced_motion && prefers_reduced_motion() {
         return;
     }
 
-    ANIMATION_STATE.with(|state| {
-        let mut state = state.borrow_mut();
-
-        // Create canvas if needed
-        let (canvas, ctx) = if let Some(ref mut s) = *state {
-            // Reuse existing canvas
-            (s.canvas.clone(), s.ctx.clone())
-        } else {
-            // Create new canvas
-            let (canvas, ctx) = create_canvas(opts.z_index);
-            *state = Some(AnimationState {
-                canvas: canvas.clone(),
-                ctx: ctx.clone(),
-                particles: Vec::new(),
-                animation_id: None,
-            });
-            (canvas, ctx)
+    let needs_new_animation = ANIMATION_STATE.with(|state| {
+        // Use try_borrow_mut to avoid panic if already borrowed
+        let Ok(mut state) = state.try_borrow_mut() else {
+            return false; // Animation loop is running, just skip
         };
 
-        // Ensure canvas is sized correctly
-        resize_canvas(&canvas);
+        if state.is_none() {
+            let (canvas, ctx) = create_canvas(opts.z_index);
+            *state = Some(AnimationState {
+                canvas,
+                ctx,
+                particles: Vec::new(),
+                is_animating: false,
+            });
+        }
 
-        let width = canvas.width() as f64;
-        let height = canvas.height() as f64;
+        let s = state.as_mut().unwrap();
+        resize_canvas(&s.canvas);
 
-        // Spawn new particles
+        let width = s.canvas.width() as f64;
+        let height = s.canvas.height() as f64;
         let start_x = width * opts.origin.x;
         let start_y = height * opts.origin.y;
-
-        let state_ref = state.as_mut().unwrap();
 
         for i in 0..opts.particle_count {
             let color = opts.colors[i as usize % opts.colors.len()];
             let shape = opts.shapes[random_int(0, opts.shapes.len())];
-            state_ref
-                .particles
-                .push(Particle::new(&opts, start_x, start_y, color, shape));
+            s.particles.push(Particle::new(&opts, start_x, start_y, color, shape));
         }
 
-        // Start animation if not already running
-        if state_ref.animation_id.is_none() {
-            start_animation();
+        if !s.is_animating {
+            s.is_animating = true;
+            true
+        } else {
+            false
         }
     });
+
+    if needs_new_animation {
+        start_animation();
+    }
 }
 
-/// Fire confetti using a specific canvas element.
-///
-/// Useful when you want to render confetti on a specific canvas
-/// rather than a fullscreen overlay.
+/// Fire confetti on a specific canvas element.
 pub fn confetti_on_canvas(canvas: &HtmlCanvasElement, opts: ConfettiOptions) {
     if opts.disable_for_reduced_motion && prefers_reduced_motion() {
         return;
@@ -461,19 +415,16 @@ pub fn confetti_on_canvas(canvas: &HtmlCanvasElement, opts: ConfettiOptions) {
         })
         .collect();
 
-    // Run standalone animation for this canvas
     run_standalone_animation(canvas.clone(), ctx, particles);
 }
 
 /// Reset/stop all confetti animations and remove the canvas.
 pub fn reset() {
     ANIMATION_STATE.with(|state| {
-        let mut state = state.borrow_mut();
-        if let Some(s) = state.take() {
-            if let Some(id) = s.animation_id {
-                cancel_animation_frame(id);
+        if let Ok(mut state) = state.try_borrow_mut() {
+            if let Some(s) = state.take() {
+                s.canvas.remove();
             }
-            s.canvas.remove();
         }
     });
 }
@@ -482,7 +433,7 @@ pub fn reset() {
 // PRESET EFFECTS
 // ============================================================================
 
-/// Fire confetti from both sides of the screen (like a celebration).
+/// Fire confetti from both sides of the screen.
 pub fn celebration() {
     confetti(ConfettiOptions {
         particle_count: 50,
@@ -575,13 +526,13 @@ fn create_canvas(z_index: i32) -> (HtmlCanvasElement, CanvasRenderingContext2d) 
         .expect("Could not cast to HtmlCanvasElement");
 
     let style = canvas.style();
-    style.set_property("position", "fixed").ok();
-    style.set_property("top", "0").ok();
-    style.set_property("left", "0").ok();
-    style.set_property("width", "100%").ok();
-    style.set_property("height", "100%").ok();
-    style.set_property("pointer-events", "none").ok();
-    style.set_property("z-index", &z_index.to_string()).ok();
+    let _ = style.set_property("position", "fixed");
+    let _ = style.set_property("top", "0");
+    let _ = style.set_property("left", "0");
+    let _ = style.set_property("width", "100%");
+    let _ = style.set_property("height", "100%");
+    let _ = style.set_property("pointer-events", "none");
+    let _ = style.set_property("z-index", &z_index.to_string());
 
     document
         .body()
@@ -619,67 +570,55 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) -> i32 {
         .expect("should register RAF")
 }
 
-fn cancel_animation_frame(id: i32) {
-    window().cancel_animation_frame(id).ok();
-}
-
 fn start_animation() {
     let f = Rc::new(RefCell::new(None::<Closure<dyn FnMut()>>));
     let g = f.clone();
 
     *g.borrow_mut() = Some(Closure::new(move || {
         let should_continue = ANIMATION_STATE.with(|state| {
-            let mut state = state.borrow_mut();
-            if let Some(ref mut s) = *state {
-                // Clear canvas
-                let width = s.canvas.width() as f64;
-                let height = s.canvas.height() as f64;
-                s.ctx.clear_rect(0.0, 0.0, width, height);
+            let Ok(mut state) = state.try_borrow_mut() else {
+                return true; // Can't borrow, try again next frame
+            };
 
-                // Update and render particles
-                s.particles.retain_mut(|p| {
-                    let alive = p.update();
-                    if alive {
-                        p.render(&s.ctx);
-                    }
-                    alive
-                });
+            let Some(ref mut s) = *state else {
+                return false;
+            };
 
-                !s.particles.is_empty()
-            } else {
-                false
-            }
+            let width = s.canvas.width() as f64;
+            let height = s.canvas.height() as f64;
+            s.ctx.clear_rect(0.0, 0.0, width, height);
+
+            s.particles.retain_mut(|p| {
+                let alive = p.update();
+                if alive {
+                    p.render(&s.ctx);
+                }
+                alive
+            });
+
+            !s.particles.is_empty()
         });
 
         if should_continue {
-            let id = request_animation_frame(f.borrow().as_ref().unwrap());
-            ANIMATION_STATE.with(|state| {
-                if let Some(ref mut s) = *state.borrow_mut() {
-                    s.animation_id = Some(id);
-                }
-            });
+            request_animation_frame(f.borrow().as_ref().unwrap());
         } else {
-            // Animation complete, clean up
             ANIMATION_STATE.with(|state| {
-                if let Some(s) = state.borrow_mut().take() {
-                    s.canvas.remove();
+                if let Ok(mut state) = state.try_borrow_mut() {
+                    if let Some(s) = state.take() {
+                        s.canvas.remove();
+                    }
                 }
             });
         }
     }));
 
-    let id = request_animation_frame(g.borrow().as_ref().unwrap());
-    ANIMATION_STATE.with(|state| {
-        if let Some(ref mut s) = *state.borrow_mut() {
-            s.animation_id = Some(id);
-        }
-    });
+    request_animation_frame(g.borrow().as_ref().unwrap());
 }
 
 fn run_standalone_animation(
     canvas: HtmlCanvasElement,
     ctx: CanvasRenderingContext2d,
-    mut particles: Vec<Particle>,
+    particles: Vec<Particle>,
 ) {
     let f = Rc::new(RefCell::new(None::<Closure<dyn FnMut()>>));
     let g = f.clone();
@@ -715,34 +654,29 @@ fn run_standalone_animation(
 }
 
 // ============================================================================
-// WASM BINDGEN EXPORTS (for non-Rust usage)
+// WASM BINDGEN EXPORTS
 // ============================================================================
 
-/// Fire confetti with default options (exported to JS)
 #[wasm_bindgen(js_name = confetti)]
 pub fn confetti_js() {
     confetti(ConfettiOptions::default());
 }
 
-/// Fire celebration preset (exported to JS)
 #[wasm_bindgen(js_name = celebration)]
 pub fn celebration_js() {
     celebration();
 }
 
-/// Fire fireworks preset (exported to JS)
 #[wasm_bindgen(js_name = fireworks)]
 pub fn fireworks_js() {
     fireworks();
 }
 
-/// Fire cannon preset (exported to JS)
 #[wasm_bindgen(js_name = cannon)]
 pub fn cannon_js() {
     cannon();
 }
 
-/// Reset all animations (exported to JS)
 #[wasm_bindgen(js_name = reset)]
 pub fn reset_js() {
     reset();
