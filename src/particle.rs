@@ -1,9 +1,8 @@
-//! Particle state and physics.
+//! Particle state and physics (platform-agnostic).
 
-use crate::animation::random;
+use crate::renderer::ConfettiRenderer;
 use crate::types::{Color, ConfettiOptions, Shape};
 use std::f64::consts::PI;
-use web_sys::CanvasRenderingContext2d;
 
 #[derive(Clone)]
 pub struct Particle {
@@ -32,12 +31,14 @@ pub struct Particle {
 }
 
 impl Particle {
+    #[must_use]
     pub fn new(
         opts: &ConfettiOptions,
         start_x: f64,
         start_y: f64,
         color: Color,
         shape: Shape,
+        rng: f64,
     ) -> Self {
         let rad_angle = opts.angle * (PI / 180.0);
         let rad_spread = opts.spread * (PI / 180.0);
@@ -45,18 +46,18 @@ impl Particle {
         Self {
             x: start_x,
             y: start_y,
-            wobble: random() * 10.0,
-            wobble_speed: f64::min(0.11, random() * 0.1 + 0.05),
-            velocity: (opts.start_velocity * 0.5) + (random() * opts.start_velocity),
-            angle_2d: -rad_angle + ((0.5 * rad_spread) - (random() * rad_spread)),
-            tilt_angle: (random() * 0.5 + 0.25) * PI,
+            wobble: rng * 10.0,
+            wobble_speed: f64::min(0.11, rng * 0.1 + 0.05),
+            velocity: (opts.start_velocity * 0.5) + (rng * opts.start_velocity),
+            angle_2d: -rad_angle + ((0.5 * rad_spread) - (rng * rad_spread)),
+            tilt_angle: (rng * 0.5 + 0.25) * PI,
             color,
             shape,
             tick: 0,
             total_ticks: opts.ticks,
             decay: opts.decay,
             drift: opts.drift,
-            random: random() + 2.0,
+            random: rng + 2.0,
             tilt_sin: 0.0,
             tilt_cos: 0.0,
             wobble_x: 0.0,
@@ -68,7 +69,8 @@ impl Particle {
         }
     }
 
-    pub fn update(&mut self) -> bool {
+    /// Update physics. Returns true if still alive.
+    pub fn update(&mut self, rng: f64) -> bool {
         self.x += self.angle_2d.cos() * self.velocity + self.drift;
         self.y += self.angle_2d.sin() * self.velocity + self.gravity;
         self.velocity *= self.decay;
@@ -87,14 +89,15 @@ impl Particle {
             self.tilt_angle += 0.1;
             self.tilt_sin = self.tilt_angle.sin();
             self.tilt_cos = self.tilt_angle.cos();
-            self.random = random() + 2.0;
+            self.random = rng + 2.0;
         }
 
         self.tick += 1;
         self.tick < self.total_ticks
     }
 
-    pub fn render(&self, ctx: &CanvasRenderingContext2d) {
+    /// Render using any backend.
+    pub fn render(&self, renderer: &mut impl ConfettiRenderer) {
         let progress = f64::from(self.tick) / f64::from(self.total_ticks);
         let alpha = 1.0 - progress;
 
@@ -103,62 +106,42 @@ impl Particle {
         let x2 = self.wobble_x + (self.random * self.tilt_cos);
         let y2 = self.wobble_y + (self.random * self.tilt_sin);
 
-        ctx.set_fill_style_str(&format!(
-            "rgba({}, {}, {}, {alpha})",
-            self.color.r, self.color.g, self.color.b
-        ));
-
-        ctx.begin_path();
-
         match self.shape {
-            Shape::Circle => self.render_circle(ctx, x1, x2, y1, y2),
-            Shape::Star => self.render_star(ctx),
-            Shape::Square => self.render_square(ctx, x1, x2, y1, y2),
+            Shape::Circle => {
+                let rx = (x2 - x1).abs() * self.oval_scalar;
+                let ry = (y2 - y1).abs() * self.oval_scalar;
+                let rotation = PI / 10.0 * self.wobble;
+                renderer.fill_ellipse(self.x, self.y, rx, ry, rotation, self.color, alpha);
+            }
+            Shape::Star => {
+                let points = self.star_points();
+                renderer.fill_polygon(&points, self.color, alpha);
+            }
+            Shape::Square => {
+                let points = [
+                    (self.x.floor(), self.y.floor()),
+                    (self.wobble_x.floor(), y1.floor()),
+                    (x2.floor(), y2.floor()),
+                    (x1.floor(), self.wobble_y.floor()),
+                ];
+                renderer.fill_polygon(&points, self.color, alpha);
+            }
         }
-
-        ctx.close_path();
-        ctx.fill();
     }
 
-    fn render_circle(&self, ctx: &CanvasRenderingContext2d, x1: f64, x2: f64, y1: f64, y2: f64) {
-        let radius_x = (x2 - x1).abs() * self.oval_scalar;
-        let radius_y = (y2 - y1).abs() * self.oval_scalar;
-        let rotation = PI / 10.0 * self.wobble;
-
-        ctx.save();
-        let _ = ctx.translate(self.x, self.y);
-        let _ = ctx.rotate(rotation);
-        let _ = ctx.scale(radius_x.max(0.1), radius_y.max(0.1));
-        let _ = ctx.arc(0.0, 0.0, 1.0, 0.0, 2.0 * PI);
-        ctx.restore();
-    }
-
-    fn render_star(&self, ctx: &CanvasRenderingContext2d) {
-        let inner_radius = 4.0 * self.scalar;
-        let outer_radius = 8.0 * self.scalar;
-        let spikes: i32 = 5;
-        let step = PI / f64::from(spikes);
+    fn star_points(&self) -> Vec<(f64, f64)> {
+        let inner = 4.0 * self.scalar;
+        let outer = 8.0 * self.scalar;
+        let step = PI / 5.0;
         let mut rot = PI / 2.0 * 3.0;
+        let mut points = Vec::with_capacity(10);
 
-        ctx.move_to(self.x, self.y - outer_radius);
-
-        for _ in 0..spikes {
-            let sx = self.x + rot.cos() * outer_radius;
-            let sy = self.y + rot.sin() * outer_radius;
-            ctx.line_to(sx, sy);
+        for _ in 0..5 {
+            points.push((self.x + rot.cos() * outer, self.y + rot.sin() * outer));
             rot += step;
-
-            let sx = self.x + rot.cos() * inner_radius;
-            let sy = self.y + rot.sin() * inner_radius;
-            ctx.line_to(sx, sy);
+            points.push((self.x + rot.cos() * inner, self.y + rot.sin() * inner));
             rot += step;
         }
-    }
-
-    fn render_square(&self, ctx: &CanvasRenderingContext2d, x1: f64, x2: f64, y1: f64, y2: f64) {
-        ctx.move_to(self.x.floor(), self.y.floor());
-        ctx.line_to(self.wobble_x.floor(), y1.floor());
-        ctx.line_to(x2.floor(), y2.floor());
-        ctx.line_to(x1.floor(), self.wobble_y.floor());
+        points
     }
 }
