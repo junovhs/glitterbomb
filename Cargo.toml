@@ -1,6 +1,6 @@
 [package]
 name = "glitterbomb"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "MIT"
 description = "A pure Rust confetti animation library. WASM + Desktop wgpu."
