@@ -1,8 +1,9 @@
 //! GPU setup and rendering
 
 use super::particle::Particle;
-use crate::types::{Color, ConfettiOptions, Origin};
+use crate::types::{ConfettiOptions, Origin};
 use std::sync::mpsc::Receiver;
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -15,14 +16,15 @@ pub enum Command {
 
 pub fn run_event_loop(rx: Receiver<Command>) {
     let event_loop = EventLoop::new().unwrap();
-    let window = WindowBuilder::new()
-        .with_transparent(true)
-        .with_decorations(false)
-        .with_always_on_top(true)
-        .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
-        .build(&event_loop)
-        .unwrap();
+    let window = Arc::new(
+        WindowBuilder::new()
+            .with_transparent(true)
+            .with_decorations(false)
+            .build(&event_loop)
+            .unwrap(),
+    );
 
+    // Center window
     if let Some(monitor) = window.current_monitor() {
         let size = monitor.size();
         let pos = monitor.position();
@@ -33,7 +35,7 @@ pub fn run_event_loop(rx: Receiver<Command>) {
     }
 
     let instance = wgpu::Instance::default();
-    let surface = instance.create_surface(&window).unwrap();
+    let surface = instance.create_surface(window.clone()).unwrap();
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         compatible_surface: Some(&surface),
         ..Default::default()
