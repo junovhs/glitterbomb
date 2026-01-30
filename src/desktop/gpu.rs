@@ -6,7 +6,11 @@ use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
 use winit::event::{Event, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
+// CHANGED: Imported EventLoopBuilder instead of EventLoop
+use winit::event_loop::{ControlFlow, EventLoopBuilder};
+// ADDED: Windows-specific extension trait
+#[cfg(target_os = "windows")]
+use winit::platform::windows::EventLoopBuilderExtWindows;
 use winit::window::WindowBuilder;
 
 pub enum Command {
@@ -15,7 +19,16 @@ pub enum Command {
 }
 
 pub fn run_event_loop(rx: Receiver<Command>) {
-    let event_loop = EventLoop::new().unwrap();
+    // CHANGED: Use Builder to allow running on non-main thread on Windows
+    #[cfg(target_os = "windows")]
+    let event_loop = EventLoopBuilder::new()
+        .with_any_thread(true)
+        .build()
+        .unwrap();
+
+    #[cfg(not(target_os = "windows"))]
+    let event_loop = EventLoopBuilder::new().build().unwrap();
+
     let window = Arc::new(
         WindowBuilder::new()
             .with_transparent(true)
