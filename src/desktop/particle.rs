@@ -15,10 +15,10 @@ pub struct Particle {
 impl Particle {
     pub fn new(opts: &ConfettiOptions, start_x: f32, start_y: f32, color: Color) -> Self {
         let mut rng = rand::thread_rng();
-        let rad_angle = opts.angle.to_radians();
-        let rad_spread = opts.spread.to_radians();
+        let rad_angle = (opts.angle as f32).to_radians();
+        let rad_spread = (opts.spread as f32).to_radians();
         let angle = rad_angle + (rng.gen::<f32>() - 0.5) * rad_spread;
-        let velocity = opts.start_velocity * (0.5 + rng.gen::<f32>());
+        let velocity = (opts.start_velocity as f32) * (0.5 + rng.gen::<f32>());
 
         Self {
             x: start_x,

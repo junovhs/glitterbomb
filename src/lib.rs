@@ -1,36 +1,31 @@
 //! # Glitterbomb 💣
 //!
 //! A pure Rust confetti animation library for WebAssembly and Desktop (wgpu).
-//! No JavaScript required.
 
 #![allow(non_snake_case)]
 
-// Platform-specific modules
-#[cfg(feature = "web")]
-pub mod web;
+// Shared types (needed by both web and desktop)
+pub mod types;
 
-#[cfg(feature = "desktop")]
-pub mod desktop;
-
-// Shared modules (always available, but web-specific for now)
+// Web-only modules
 #[cfg(feature = "web")]
 mod animation;
 
+// Platform-specific implementations
+#[cfg(feature = "desktop")]
+pub mod desktop;
 #[cfg(feature = "web")]
-mod types;
+pub mod web;
 
+// Particle implementations
 #[cfg(feature = "web")]
 mod particle {
     pub mod wasm;
     pub use wasm::Particle;
 }
 
-// Re-exports
-#[cfg(feature = "web")]
-pub use types::{default_colors, Color, ConfettiOptions, Origin, Shape};
-
+// Re-exports based on feature
+#[cfg(all(feature = "desktop", not(feature = "web")))]
+pub use desktop::{cannon, celebration, confetti, confetti_on_canvas, fireworks, reset, snow};
 #[cfg(feature = "web")]
 pub use web::{cannon, celebration, confetti, confetti_on_canvas, fireworks, reset, snow};
-
-#[cfg(feature = "desktop")]
-pub use desktop::{cannon, celebration, confetti, confetti_on_canvas, fireworks, reset, snow};

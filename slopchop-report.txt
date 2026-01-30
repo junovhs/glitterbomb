@@ -1,5 +1,5 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-30 11:25:11
+Generated: 2026-01-30 11:31:13
 Status: PASSED
 
 === DASHBOARD ===
@@ -8,10 +8,10 @@ Top 5 Cognitive Complexity:
   6    src\web.rs
   5    src\animation.rs
   4    src\particle\wasm.rs
-  1    src\types.rs
+  3    src\desktop\mod.rs
 
 Top 5 Largest Files (Tokens):
-  1980  src\desktop\gpu.rs
+  1799  src\desktop\gpu.rs
   1567  src\types.rs
   1426  src\particle\wasm.rs
   1379  README.md
@@ -24,19 +24,19 @@ None. Codebase is clean.
 
 >>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic
     Checking glitterbomb v0.1.1 (C:\Users\SpencerNunamakerTrav\glitterbomb)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.36s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.34s
 
 
 >>> COMMAND: cargo test
 
 running 8 tests
-test types::tests::color_from_hex_full ... ok
+test types::tests::color_constants ... ok
+test types::tests::color_from_hex_no_hash ... ok
+test types::tests::color_from_hex_short ... ok
+test types::tests::default_colors_not_empty ... ok
 test types::tests::origin_default ... ok
 test types::tests::shape_default ... ok
-test types::tests::default_colors_not_empty ... ok
-test types::tests::color_constants ... ok
-test types::tests::color_from_hex_short ... ok
-test types::tests::color_from_hex_no_hash ... ok
+test types::tests::color_from_hex_full ... ok
 test types::tests::confetti_options_defaults ... ok
 
 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
@@ -48,7 +48,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
    Compiling glitterbomb v0.1.1 (C:\Users\SpencerNunamakerTrav\glitterbomb)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.72s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.54s
      Running unittests src\lib.rs (target\debug\deps\glitterbomb-d28214eca2631f9b.exe)
    Doc-tests glitterbomb
 

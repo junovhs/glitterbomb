@@ -24,10 +24,10 @@ fn vs_main(
     );
 
     var out: VertexOutput;
-    let scale = 5.0; // particle size
+    let scale = 5.0;
     let pos = positions[vi] * scale + instance_pos;
     out.clip_position = vec4<f32>((pos / vec2<f32>(400.0, 300.0)) - vec2<f32>(1.0, 1.0), 0.0, 1.0);
-    out.clip_position.y = -out.clip_position.y; // flip y
+    out.clip_position.y = -out.clip_position.y;
     out.color = instance_color;
     return out;
 }

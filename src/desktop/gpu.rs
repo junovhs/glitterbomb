@@ -1,54 +1,26 @@
 //! GPU setup and rendering
 
-use super::{Command, Particle};
+use super::particle::Particle;
 use crate::types::{Color, ConfettiOptions, Origin};
 use std::sync::mpsc::Receiver;
+use wgpu::util::DeviceExt;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
+
+pub enum Command {
+    Fireworks,
+    Celebration,
+}
 
 pub fn run_event_loop(rx: Receiver<Command>) {
     let event_loop = EventLoop::new().unwrap();
-    let window = create_window(&event_loop);
-    let (instance, surface) = create_surface(&window);
-    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-        compatible_surface: Some(&surface),
-        ..Default::default()
-    }))
-    .unwrap();
-
-    let (device, queue) =
-        pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None))
-            .unwrap();
-
-    let pipeline = create_pipeline(&device, &surface, &adapter);
-    let mut particles: Vec<Particle> = Vec::new();
-
-    event_loop
-        .run(move |event, elwt| {
-            elwt.set_control_flow(ControlFlow::Poll);
-            handle_event(&event, &rx, &mut particles, elwt, &window);
-
-            if let Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } = event
-            {
-                if particles.is_empty() {
-                    return;
-                }
-                render(&surface, &device, &queue, &pipeline, &mut particles);
-            }
-        })
-        .unwrap();
-}
-
-fn create_window(event_loop: &EventLoop<()>) -> winit::window::Window {
     let window = WindowBuilder::new()
         .with_transparent(true)
         .with_decorations(false)
         .with_always_on_top(true)
         .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
-        .build(event_loop)
+        .build(&event_loop)
         .unwrap();
 
     if let Some(monitor) = window.current_monitor() {
@@ -59,20 +31,19 @@ fn create_window(event_loop: &EventLoop<()>) -> winit::window::Window {
             pos.y + (size.height as i32 - 600) / 2,
         ));
     }
-    window
-}
 
-fn create_surface(window: &winit::window::Window) -> (wgpu::Instance, wgpu::Surface) {
     let instance = wgpu::Instance::default();
-    let surface = instance.create_surface(window).unwrap();
-    (instance, surface)
-}
+    let surface = instance.create_surface(&window).unwrap();
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        compatible_surface: Some(&surface),
+        ..Default::default()
+    }))
+    .unwrap();
 
-fn create_pipeline(
-    device: &wgpu::Device,
-    surface: &wgpu::Surface,
-    adapter: &wgpu::Adapter,
-) -> wgpu::RenderPipeline {
+    let (device, queue) =
+        pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None))
+            .unwrap();
+
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Particle Shader"),
         source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!("shader.wgsl"))),
@@ -84,9 +55,9 @@ fn create_pipeline(
         push_constant_ranges: &[],
     });
 
-    let format = surface.get_capabilities(adapter).formats[0];
+    let format = surface.get_capabilities(&adapter).formats[0];
 
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Render Pipeline"),
         layout: Some(&layout),
         vertex: wgpu::VertexState {
@@ -122,28 +93,37 @@ fn create_pipeline(
         depth_stencil: None,
         multisample: wgpu::MultisampleState::default(),
         multiview: None,
-    })
-}
+    });
 
-fn handle_event(
-    event: &Event<()>,
-    rx: &Receiver<Command>,
-    particles: &mut Vec<Particle>,
-    elwt: &winit::event_loop::EventLoopWindowTarget<()>,
-    window: &winit::window::Window,
-) {
-    if let Ok(cmd) = rx.try_recv() {
-        spawn(cmd, particles);
-        window.request_redraw();
-    }
+    let mut particles: Vec<Particle> = Vec::new();
 
-    if let Event::WindowEvent {
-        event: WindowEvent::CloseRequested,
-        ..
-    } = event
-    {
-        elwt.exit();
-    }
+    event_loop
+        .run(move |event, elwt| {
+            elwt.set_control_flow(ControlFlow::Poll);
+
+            if let Ok(cmd) = rx.try_recv() {
+                spawn(cmd, &mut particles);
+                window.request_redraw();
+            }
+
+            match event {
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } => elwt.exit(),
+                Event::WindowEvent {
+                    event: WindowEvent::RedrawRequested,
+                    ..
+                } => {
+                    if particles.is_empty() {
+                        return;
+                    }
+                    render(&surface, &device, &queue, &pipeline, &mut particles);
+                }
+                _ => {}
+            }
+        })
+        .unwrap();
 }
 
 fn spawn(cmd: Command, particles: &mut Vec<Particle>) {
