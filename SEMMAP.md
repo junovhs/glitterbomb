@@ -21,36 +21,25 @@ Configuration for slopchop. Centralizes project configuration.
 ## Layer 1 -- Core
 
 `src/lib.rs`
-# Glitterbomb 💣  A pure Rust confetti animation library. Provides application entry point.
-
-`src/web/mod.rs`
-Web (WASM) renderer using Canvas 2D. Supports application functionality.
-→ Exports: WebRenderer, cannon, cannon_js, celebration, celebration_js, confetti, confetti_js, fireworks, fireworks_js, new, reset, reset_js, set_size, snow
+# Glitterbomb 💣  A pure Rust confetti animation library for WebAssembly. Provides application entry point.
+→ Exports: cannon, cannon_js, celebration, celebration_js, confetti, confetti_js, confetti_on_canvas, fireworks, fireworks_js, reset, reset_js, snow
 
 ## Layer 2 -- Domain
 
-`src/desktop.rs`
-Desktop renderer using tiny-skia + minifb. Supports application functionality.
-→ Exports: DesktopRenderer, celebration, confetti, fireworks, run_window
+`src/animation.rs`
+Animation state and rendering loop. Supports application functionality.
+→ Exports: AnimationState, create_canvas, get_context, new, prefers_reduced_motion, random, random_int, resize_canvas, run_standalone_animation, start_animation
 
 `src/particle.rs`
-Particle state and physics (platform-agnostic). Supports application functionality.
-→ Exports: Particle, new, render, update
-
-`src/renderer.rs`
-Platform-agnostic renderer trait. Formats data for output.
-→ Exports: ConfettiRenderer, Ellipse
+Particle state and physics. Supports application functionality.
+→ Exports: Particle, TestCfg, new, render, test, update
 
 `src/types.rs`
 Public types for confetti configuration. Defines domain data structures.
 → Exports: Color, ConfettiOptions, Origin, Shape, default_colors, from_hex
 
-`src/web/state.rs`
-Web animation state management. Supports application functionality.
-→ Exports: AnimState, create_canvas, new, prefers_reduced_motion, random, resize_canvas, start_loop
-
 ## Layer 4 -- Tests
 
-`examples/desktop_test.rs`
-Run with: cargo run --example desktop_test --features desktop --no-default-features. Verifies correctness.
+`tests/wasm.rs`
+WASM browser tests - Run with: wasm-pack test --headless --firefox. Verifies correctness.
 

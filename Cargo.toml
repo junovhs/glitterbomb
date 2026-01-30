@@ -2,7 +2,6 @@
 name = "glitterbomb"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <you@example.com>"]
 license = "MIT"
 description = "A pure Rust confetti animation library for WebAssembly. No JS required."
 repository = "https://github.com/junovhs/glitterbomb"

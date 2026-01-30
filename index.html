@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Glitterbomb Test</title>
+    </head>
+    <body>
+        <button id="celebration">🎉 Celebration</button>
+        <button id="fireworks">🎆 Fireworks</button>
+        <button id="cannon">💥 Cannon</button>
+        <button id="confetti">✨ Confetti</button>
+        <script type="module">
+            import init, * as glitterbomb from "./pkg/glitterbomb.js";
+
+            async function run() {
+                await init();
+                document.getElementById("celebration").onclick =
+                    glitterbomb.celebration;
+                document.getElementById("fireworks").onclick =
+                    glitterbomb.fireworks;
+                document.getElementById("cannon").onclick = glitterbomb.cannon;
+                document.getElementById("confetti").onclick = () =>
+                    glitterbomb.confetti();
+            }
+            run();
+        </script>
+    </body>
+</html>
