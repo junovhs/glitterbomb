@@ -1,57 +1,68 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-19 20:45:28
+Generated: 2026-01-29 20:14:37
 Status: FAILED
 
 === DASHBOARD ===
 Top 5 Cognitive Complexity:
-  6    src/web/mod.rs
-  5    src/web/state.rs
-  4    src/desktop.rs
+  6    src/lib.rs
+  5    src/animation.rs
   4    src/particle.rs
+  1    tests/wasm.rs
   1    src/types.rs
 
 Top 5 Largest Files (Tokens):
-  1504  src/web/mod.rs
-  1387  src/desktop.rs
+  2792  src/particle.rs
+  1562  src/types.rs
   1379  README.md
-  1286  src/particle.rs
-  1050  src/types.rs
+  1352  src/animation.rs
+  1248  src/lib.rs
 
 === VIOLATIONS ===
 [SlopChop Internal Rules]
-src/web/mod.rs:13 | LCOM4 | Class 'WebRenderer' has low cohesion (LCOM4: 2)
-src/desktop.rs:12 | LCOM4 | Class 'DesktopRenderer' has low cohesion (LCOM4: 2)
-src/desktop.rs:12 | CBO | Class 'DesktopRenderer' is tightly coupled (CBO: 17)
-src/desktop.rs:12 | SFOUT | Class 'DesktopRenderer' has high fan-out (SFOUT: 10)
-src/particle.rs:8 | CBO | Class 'Particle' is tightly coupled (CBO: 13)
-src/particle.rs:8 | SFOUT | Class 'Particle' has high fan-out (SFOUT: 9)
+src/particle.rs:1 | LAW OF ATOMICITY | File size is 2792 tokens (Limit: 2000)
 
 [External Tools]
 
 === FULL OUTPUT LOGS ===
 
 >>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic
-    Checking glitterbomb v0.2.0 (/home/juno/glitterbomb)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s
 
 
 >>> COMMAND: cargo test
+
+running 14 tests
+test particle::tests::angles ... ok
+test particle::tests::formula ... ok
+test particle::tests::decay ... ok
+test particle::tests::lifecycle ... ok
+test particle::tests::physics ... ok
+test particle::tests::wobble ... ok
+test types::tests::color_constants ... ok
+test types::tests::color_from_hex_full ... ok
+test types::tests::color_from_hex_no_hash ... ok
+test types::tests::color_from_hex_short ... ok
+test types::tests::confetti_options_defaults ... ok
+test types::tests::default_colors_not_empty ... ok
+test types::tests::origin_default ... ok
+test types::tests::shape_default ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
 
 running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-running 2 tests
-test src/lib.rs - (line 15) ... ignored
-test src/lib.rs - (line 8) ... ignored
+running 0 tests
 
-test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-   Compiling glitterbomb v0.2.0 (/home/juno/glitterbomb)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
-     Running unittests src/lib.rs (target/debug/deps/glitterbomb-444d85f73ad34ad0)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src/lib.rs (target/debug/deps/glitterbomb-a6eb0679109f2b0f)
+     Running tests/wasm.rs (target/debug/deps/wasm-7461b39e3513e451)
    Doc-tests glitterbomb
 
 

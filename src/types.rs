@@ -1,6 +1,6 @@
 //! Public types for confetti configuration.
 
-/// RGB color representation.
+/// RGB color representation
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Color {
     pub r: u8,
@@ -16,7 +16,6 @@ impl Color {
     pub const CYAN: Self = Self::new(0, 255, 255);
     pub const MAGENTA: Self = Self::new(255, 0, 255);
     pub const WHITE: Self = Self::new(255, 255, 255);
-    pub const BLACK: Self = Self::new(0, 0, 0);
 
     #[must_use]
     pub const fn new(r: u8, g: u8, b: u8) -> Self {
@@ -26,32 +25,25 @@ impl Color {
     #[must_use]
     pub fn from_hex(hex: &str) -> Self {
         let hex = hex.trim_start_matches('#');
-        let expanded = if hex.len() == 3 {
-            let c: Vec<char> = hex.chars().collect();
-            format!("{}{}{}{}{}{}", c[0], c[0], c[1], c[1], c[2], c[2])
+        let hex = if hex.len() == 3 {
+            let chars: Vec<char> = hex.chars().collect();
+            format!(
+                "{}{}{}{}{}{}",
+                chars[0], chars[0], chars[1], chars[1], chars[2], chars[2]
+            )
         } else {
             hex.to_string()
         };
 
-        Self {
-            r: u8::from_str_radix(&expanded[0..2], 16).unwrap_or(0),
-            g: u8::from_str_radix(&expanded[2..4], 16).unwrap_or(0),
-            b: u8::from_str_radix(&expanded[4..6], 16).unwrap_or(0),
-        }
-    }
+        let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+        let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+        let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
 
-    #[must_use]
-    pub const fn to_rgba(self, alpha: u8) -> u32 {
-        ((self.r as u32) << 24) | ((self.g as u32) << 16) | ((self.b as u32) << 8) | (alpha as u32)
-    }
-
-    #[must_use]
-    pub const fn to_argb(self, alpha: u8) -> u32 {
-        ((alpha as u32) << 24) | ((self.r as u32) << 16) | ((self.g as u32) << 8) | (self.b as u32)
+        Self { r, g, b }
     }
 }
 
-/// Default confetti color palette.
+/// Default confetti color palette
 #[must_use]
 pub fn default_colors() -> Vec<Color> {
     vec![
@@ -65,7 +57,7 @@ pub fn default_colors() -> Vec<Color> {
     ]
 }
 
-/// Shape of confetti particles.
+/// Shape of confetti particles
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Shape {
     #[default]
@@ -74,8 +66,8 @@ pub enum Shape {
     Star,
 }
 
-/// Origin point for confetti emission (0.0 to 1.0).
-#[derive(Clone, Copy, Debug)]
+/// Origin point for confetti emission (0.0 to 1.0, relative to canvas)
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Origin {
     pub x: f64,
     pub y: f64,
@@ -87,7 +79,7 @@ impl Default for Origin {
     }
 }
 
-/// Configuration options for confetti animation.
+/// Configuration options for confetti animation
 #[derive(Clone, Debug)]
 pub struct ConfettiOptions {
     pub particle_count: u32,
@@ -126,5 +118,70 @@ impl Default for ConfettiOptions {
             flat: false,
             disable_for_reduced_motion: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn color_from_hex_full() {
+        assert_eq!(Color::from_hex("#ff0000"), Color::new(255, 0, 0));
+        assert_eq!(Color::from_hex("#00ff00"), Color::new(0, 255, 0));
+        assert_eq!(Color::from_hex("#0000ff"), Color::new(0, 0, 255));
+        assert_eq!(Color::from_hex("#a5b7c9"), Color::new(0xa5, 0xb7, 0xc9));
+    }
+
+    #[test]
+    fn color_from_hex_short() {
+        assert_eq!(Color::from_hex("#f00"), Color::new(255, 0, 0));
+        assert_eq!(Color::from_hex("#0f0"), Color::new(0, 255, 0));
+        assert_eq!(Color::from_hex("#abc"), Color::new(0xaa, 0xbb, 0xcc));
+    }
+
+    #[test]
+    fn color_from_hex_no_hash() {
+        assert_eq!(Color::from_hex("ff0000"), Color::new(255, 0, 0));
+        assert_eq!(Color::from_hex("f00"), Color::new(255, 0, 0));
+    }
+
+    #[test]
+    fn color_constants() {
+        assert_eq!(Color::RED, Color::new(255, 0, 0));
+        assert_eq!(Color::GREEN, Color::new(0, 255, 0));
+        assert_eq!(Color::BLUE, Color::new(0, 0, 255));
+        assert_eq!(Color::WHITE, Color::new(255, 255, 255));
+    }
+
+    #[test]
+    fn default_colors_not_empty() {
+        let colors = default_colors();
+        assert_eq!(colors.len(), 7);
+        assert_eq!(colors[0], Color::new(0x26, 0xcc, 0xff));
+    }
+
+    #[test]
+    fn origin_default() {
+        let o = Origin::default();
+        assert!((o.x - 0.5).abs() < f64::EPSILON);
+        assert!((o.y - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn confetti_options_defaults() {
+        let opts = ConfettiOptions::default();
+        assert_eq!(opts.particle_count, 50);
+        assert!((opts.angle - 90.0).abs() < f64::EPSILON);
+        assert!((opts.spread - 45.0).abs() < f64::EPSILON);
+        assert!((opts.decay - 0.9).abs() < f64::EPSILON);
+        assert_eq!(opts.ticks, 200);
+        assert!(!opts.shapes.is_empty());
+        assert!(!opts.colors.is_empty());
+    }
+
+    #[test]
+    fn shape_default() {
+        assert_eq!(Shape::default(), Shape::Square);
     }
 }
