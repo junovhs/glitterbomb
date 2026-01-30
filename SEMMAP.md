@@ -15,6 +15,9 @@
 `Cargo.toml`
 Rust package manifest and dependencies. Centralizes project configuration.
 
+`pkg/package.json`
+Node.js package manifest. Centralizes project configuration.
+
 `slopchop.toml`
 Configuration for slopchop. Centralizes project configuration.
 
@@ -25,6 +28,15 @@ Configuration for slopchop. Centralizes project configuration.
 → Exports: cannon, cannon_js, celebration, celebration_js, confetti, confetti_js, confetti_on_canvas, fireworks, fireworks_js, reset, reset_js, snow
 
 ## Layer 2 -- Domain
+
+`pkg/glitterbomb.d.ts`
+Implements glitterbomb.d functionality. Supports application functionality.
+
+`pkg/glitterbomb.js`
+Implements glitterbomb functionality. Supports application functionality.
+
+`pkg/glitterbomb_bg.wasm.d.ts`
+Implements glitterbomb bg.wasm.d. Supports application functionality.
 
 `src/animation.rs`
 Animation state and rendering loop. Supports application functionality.
@@ -42,4 +54,3 @@ Public types for confetti configuration. Defines domain data structures.
 
 `tests/wasm.rs`
 WASM browser tests - Run with: wasm-pack test --headless --firefox. Verifies correctness.
-
