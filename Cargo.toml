@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 description = "A pure Rust confetti animation library for WebAssembly. No JS required."
 repository = "https://github.com/junovhs/glitterbomb"
-keywords = ["confetti", "wasm", "canvas", "animation", "dioxus", "glitter"]
+keywords = ["confetti", "wasm", "canvas", "dioxus", "glitter"]
 categories = ["wasm", "web-programming", "graphics"]
 readme = "README.md"
 
